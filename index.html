@@ -133,6 +133,19 @@
   }
   .contact-btn:hover{background:var(--ink); color:#fff;}
 
+  .auth-form textarea{padding:11px 12px;border-radius:9px;border:1.5px solid var(--line);font-family:'Inter',sans-serif;font-size:14.5px;background:#fff;color:var(--text);resize:vertical;min-height:70px;}
+  .auth-form textarea:focus{outline:2px solid var(--gold);outline-offset:1px;}
+  .form-error{color:var(--red);font-size:13px;font-weight:600;margin:0 0 12px;}
+  .form-error:empty{display:none;}
+  .seller{font-size:12px;color:var(--text-soft);margin:0;}
+  .empty{grid-column:1/-1;color:var(--text-soft);font-size:14.5px;padding:24px 0;}
+  .banner{max-width:1080px;margin:0 auto 18px;padding:0 20px;}
+  .banner div{background:var(--paper-2);border:1px solid var(--line);border-left:4px solid var(--gold);padding:10px 14px;border-radius:8px;font-size:13px;color:var(--text-soft);}
+  .card-body .meta{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+  .contact-btn:disabled{opacity:.5;cursor:default;}
+  .contact-btn:disabled:hover{background:transparent;color:var(--ink);}
+  :root[data-theme="dark"] .auth-form textarea{background:#1D212C;}
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .auth-form textarea{background:#1D212C;}}
   .panel{display:none;}
   .panel.active{display:block;}
 
@@ -193,6 +206,9 @@
   :root[data-theme="dark"] .card{background:#1D212C;}
   :root[data-theme="dark"] .search-bar input{background:#1D212C; color:var(--text);}
 </style>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 </head>
 <body>
 
@@ -219,12 +235,13 @@
       <button class="modal-tab" data-form="register">Crear perfil</button>
     </div>
 
+    <p class="form-error" id="authError"></p>
     <form class="auth-form active" id="loginForm">
       <label>Correo institucional
-        <input type="email" placeholder="tunombre@unmsm.edu.pe" required>
+        <input type="email" name="email" placeholder="tunombre@unmsm.edu.pe" required>
       </label>
       <label>Contraseña
-        <input type="password" placeholder="••••••••" required>
+        <input type="password" name="password" placeholder="••••••••" required>
       </label>
       <button type="submit" class="btn-primary" style="width:100%;">Ingresar</button>
       <p class="form-note">¿No tienes cuenta? <a href="#" data-switch="register">Crea tu perfil aquí</a></p>
@@ -232,13 +249,13 @@
 
     <form class="auth-form" id="registerForm">
       <label>Nombre completo
-        <input type="text" placeholder="Nombres y apellidos" required>
+        <input type="text" name="name" placeholder="Nombres y apellidos" required>
       </label>
-      <label>Correo institucional
-        <input type="email" placeholder="tunombre@unmsm.edu.pe" required>
+      <label>Correo institucional (@unmsm.edu.pe)
+        <input type="email" name="email" placeholder="tunombre@unmsm.edu.pe" required>
       </label>
       <label>Facultad
-        <select required>
+        <select name="faculty" required>
           <option value="">Selecciona tu facultad</option>
           <option>Letras y Ciencias Humanas</option>
           <option>Derecho y Ciencia Política</option>
@@ -263,10 +280,13 @@
           </select>
       </label>
       <label>Ciclo actual
-        <input type="text" placeholder="Ej. 6to ciclo" required>
+        <input type="text" name="cycle" placeholder="Ej. 6to ciclo" required>
       </label>
-      <label>Contraseña
-        <input type="password" placeholder="Crea una contraseña" required>
+      <label>WhatsApp (9 dígitos)
+        <input type="tel" name="phone" placeholder="987654321" pattern="9[0-9]{8}" required>
+      </label>
+      <label>Contraseña (mínimo 6 caracteres)
+        <input type="password" name="password" minlength="6" placeholder="Crea una contraseña" required>
       </label>
       <button type="submit" class="btn-primary" style="width:100%;">Crear mi perfil</button>
       <p class="form-note">¿Ya tienes cuenta? <a href="#" data-switch="login">Inicia sesión</a></p>
@@ -279,7 +299,7 @@
   <p>Un solo lugar para todo lo que circula en la universidad: productos, libros, apuntes y servicios de otros sanmarquinos.</p>
   <div class="search-bar">
     <input type="text" id="searchInput" placeholder="Busca un producto, libro o servicio...">
-    <button class="btn-primary" onclick="applyFilter()">Buscar</button>
+    <button class="btn-primary" onclick="render()">Buscar</button>
   </div>
   <div class="stats">
     <div class="stat"><b>3</b><span>categorías activas</span></div>
@@ -287,6 +307,8 @@
     <div class="stat"><b>S/0</b><span>comisión en el piloto</span></div>
   </div>
 </div>
+
+<div class="banner" id="modeBanner" hidden><div>Modo demo: las cuentas y publicaciones se guardan solo en este navegador. Conecta Firebase para que todos vean lo mismo.</div></div>
 
 <main>
 
@@ -297,16 +319,10 @@
         <h2>Vitrina</h2>
         <p>Cualquier estudiante puede publicar un producto para vender o alquilar.</p>
       </div>
-      <button class="add-btn">+ Publicar producto</button>
+      <button class="add-btn" data-add="vitrina">+ Publicar producto</button>
     </div>
-    <div class="filter-row">
-      <button class="chip active">Todos</button>
-      <button class="chip">Electrónica</button>
-      <button class="chip">Ropa</button>
-      <button class="chip">Comida</button>
-      <button class="chip">Alquiler</button>
-    </div>
-    <div class="grid" id="vitrinaGrid"></div>
+    <div class="filter-row" id="chips-vitrina"></div>
+    <div class="grid" id="grid-vitrina"></div>
   </section>
 
   <!-- LIBROS -->
@@ -316,16 +332,10 @@
         <h2>Libros y apuntes</h2>
         <p>Separatas, resúmenes, libros de texto y exámenes resueltos de ciclos anteriores.</p>
       </div>
-      <button class="add-btn">+ Publicar libro</button>
+      <button class="add-btn" data-add="libros">+ Publicar libro</button>
     </div>
-    <div class="filter-row">
-      <button class="chip active">Todos</button>
-      <button class="chip">Ciencias e Ingeniería</button>
-      <button class="chip">Ciencias de la Salud</button>
-      <button class="chip">Humanidades y Sociales</button>
-      <button class="chip">Apuntes digitales</button>
-    </div>
-    <div class="grid" id="librosGrid"></div>
+    <div class="filter-row" id="chips-libros"></div>
+    <div class="grid" id="grid-libros"></div>
   </section>
 
   <!-- SERVICIOS -->
@@ -335,126 +345,246 @@
         <h2>Servicios entre estudiantes</h2>
         <p>Audiovisual, diseño, tutorías, trámites y más, ofrecidos por compañeros de todas las facultades.</p>
       </div>
-      <button class="add-btn">+ Ofrecer servicio</button>
+      <button class="add-btn" data-add="servicios">+ Ofrecer servicio</button>
     </div>
-    <div class="filter-row">
-      <button class="chip active">Todos</button>
-      <button class="chip">Audiovisual</button>
-      <button class="chip">Tutorías</button>
-      <button class="chip">Diseño</button>
-      <button class="chip">Trámites</button>
-    </div>
-    <div class="grid" id="serviciosGrid"></div>
+    <div class="filter-row" id="chips-servicios"></div>
+    <div class="grid" id="grid-servicios"></div>
   </section>
 
 </main>
 
+<div class="modal-overlay" id="pubOverlay">
+  <div class="modal">
+    <button class="modal-close" id="closePubBtn">&times;</button>
+    <h2 id="pubTitle" style="font-size:19px;margin:0 0 14px;">Publicar</h2>
+    <p class="form-error" id="pubError"></p>
+    <form class="auth-form active" id="pubForm">
+      <label>Título
+        <input type="text" name="title" maxlength="70" placeholder="Ej. Calculadora científica" required>
+      </label>
+      <label>Categoría
+        <select name="category" id="pubCat" required></select>
+      </label>
+      <label>Precio en soles (0 = a consultar)
+        <input type="number" name="price" min="0" step="0.5" value="0" required>
+      </label>
+      <label>Descripción
+        <textarea name="description" maxlength="200" placeholder="Estado, condiciones, dónde entregas..." required></textarea>
+      </label>
+      <button type="submit" class="btn-primary" style="width:100%;">Publicar</button>
+      <p class="form-note">Te contactarán por el WhatsApp de tu perfil.</p>
+    </form>
+  </div>
+</div>
+
 <footer>UNISPOT — proyecto de emprendimiento estudiantil, UNMSM · demo ilustrativa, sin datos reales</footer>
 
 <script>
+// ===== CONFIGURACIÓN =====
+// Pega aquí la configuración de tu proyecto Firebase para tener cuentas y publicaciones compartidas.
+// Mientras sea null, la página funciona en modo demo (datos solo en tu navegador).
+const FIREBASE_CONFIG = null;
+
+const SECTIONS = {
+  vitrina:{noun:'producto', cats:['Electrónica','Ropa','Comida','Alquiler','Otros']},
+  libros:{noun:'libro o apunte', cats:['Ciencias e Ingeniería','Ciencias de la Salud','Humanidades y Sociales','Apuntes digitales']},
+  servicios:{noun:'servicio', cats:['Audiovisual','Tutorías','Diseño','Trámites','Otros']}
+};
+const ICON = {'Electrónica':'🎧','Ropa':'👔','Comida':'🍱','Alquiler':'📷','Otros':'📦','Ciencias e Ingeniería':'📘','Ciencias de la Salud':'🩺','Humanidades y Sociales':'📗','Apuntes digitales':'📝','Audiovisual':'🎬','Tutorías':'🎓','Diseño':'🎨','Trámites':'📄'};
 const COLORS = ['#14213D','#C1272D','#3E7B4F','#8B5E3C','#5B4B8A','#1F6F78'];
-function pick(i){ return COLORS[i % COLORS.length]; }
+const SEED = [
+  {section:'vitrina',category:'Alquiler',title:'Calculadora científica',description:'Alquiler por examen, devolución el mismo día.',price:'3'},
+  {section:'vitrina',category:'Electrónica',title:'Audífonos inalámbricos',description:'Casi nuevos, entrego en la sede central.',price:'45'},
+  {section:'libros',category:'Ciencias e Ingeniería',title:'Matemática I — banco de ejercicios',description:'Con soluciones paso a paso.',price:'10'},
+  {section:'libros',category:'Ciencias de la Salud',title:'Anatomía — atlas y fichas',description:'Impreso a color, poco uso.',price:'25'},
+  {section:'servicios',category:'Audiovisual',title:'Grabación y edición de exposiciones',description:'Entrega en 48 h, con subtítulos.',price:'35'},
+  {section:'servicios',category:'Tutorías',title:'Asesoría en Matemática I',description:'Sesión de 1 hora, presencial o virtual.',price:'20'}
+].map(x=>({...x,sellerName:'Ejemplo UNISPOT',sellerFaculty:'UNMSM',sellerPhone:'',uid:'seed'}));
 
-const vitrina = [
-  {tag:'Electrónica', icon:'🎧', name:'Audífonos inalámbricos', meta:'Casi nuevos · Pabellón A', price:'S/45'},
-  {tag:'Alquiler', icon:'🧮', name:'Calculadora científica', meta:'Alquiler por examen · Devolución el mismo día', price:'S/3 /día'},
-  {tag:'Ropa', icon:'👔', name:'Terno formal talla M', meta:'Ideal para sustentaciones y entrevistas', price:'S/60'},
-  {tag:'Comida', icon:'🍱', name:'Menú saludable por encargo', meta:'Entrega en tu facultad · Lun a Vie', price:'S/8'},
-  {tag:'Electrónica', icon:'🔌', name:'Extensión + cargador USB-C', meta:'Para salones sin tomacorriente cerca', price:'S/15'},
-  {tag:'Alquiler', icon:'📷', name:'Cámara para exposiciones', meta:'Alquiler por día, incluye trípode', price:'S/20 /día'},
-];
+const $ = id => document.getElementById(id);
+const esc = t => String(t ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const state = {user:null, listings:[], cat:{vitrina:'Todos',libros:'Todos',servicios:'Todos'}, q:''};
 
-const libros = [
-  {tag:'Humanidades y Sociales', icon:'📗', name:'Contabilidad Financiera I — resumen', meta:'Ciclo 2025-II · PDF + impreso', price:'S/12'},
-  {tag:'Ciencias e Ingeniería', icon:'📘', name:'Matemática I — banco de ejercicios', meta:'Con soluciones paso a paso', price:'S/10'},
-  {tag:'Apuntes digitales', icon:'📝', name:'Apuntes de Pensamiento Crítico', meta:'Todo el ciclo, formato digital', price:'S/6'},
-  {tag:'Humanidades y Sociales', icon:'📙', name:'Introducción al Derecho — separata', meta:'Fotocopia anillada', price:'S/9'},
-  {tag:'Ciencias de la Salud', icon:'🩺', name:'Anatomía — atlas y fichas de repaso', meta:'Impreso a color, poco uso', price:'S/25'},
-  {tag:'Apuntes digitales', icon:'📝', name:'Fichas de repaso — parciales', meta:'Formato para imprimir', price:'S/5'},
-];
+// ===== BACKEND LOCAL (modo demo) =====
+const local = {
+  mode:'local',
+  read(k,d){ try{ const v=JSON.parse(localStorage.getItem(k)); return v ?? d; }catch(e){ return d; } },
+  write(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} },
+  init(onUser,onList){
+    this.onUser=onUser; this.onList=onList;
+    if(!this.read('us_listings',null)) this.write('us_listings',SEED.map((x,i)=>({...x,id:'seed'+i})));
+    onList(this.read('us_listings',[])); onUser(this.read('us_session',null));
+  },
+  async register(p){
+    const users=this.read('us_users',[]);
+    if(users.some(u=>u.email===p.email)) throw new Error('Ese correo ya tiene un perfil.');
+    const user={...p,uid:p.email}; users.push(user); this.write('us_users',users);
+    const {password,...profile}=user; this.write('us_session',profile); this.onUser(profile);
+  },
+  async login(email,password){
+    const u=this.read('us_users',[]).find(x=>x.email===email && x.password===password);
+    if(!u) throw new Error('Correo o contraseña incorrectos.');
+    const {password:_,...profile}=u; this.write('us_session',profile); this.onUser(profile);
+  },
+  async logout(){ try{ localStorage.removeItem('us_session'); }catch(e){} this.onUser(null); },
+  async add(l){ const a=this.read('us_listings',[]); a.unshift({...l,id:'l'+Date.now()}); this.write('us_listings',a); this.onList(a); },
+  async remove(id){ const a=this.read('us_listings',[]).filter(x=>x.id!==id); this.write('us_listings',a); this.onList(a); }
+};
 
-const servicios = [
-  {tag:'Audiovisual', icon:'🎬', name:'Grabación y edición de exposiciones', meta:'Entrega en 48h · con subtítulos', price:'S/35'},
-  {tag:'Tutorías', icon:'🎓', name:'Asesoría en Matemática I', meta:'Sesión de 1 hora, presencial o virtual', price:'S/20 /h'},
-  {tag:'Diseño', icon:'🎨', name:'Diseño de infografías para trabajos', meta:'Entrega en 24h', price:'S/18'},
-  {tag:'Trámites', icon:'📄', name:'Apoyo con constancias y trámites en la sede central', meta:'Te ahorras la cola', price:'S/10'},
-  {tag:'Audiovisual', icon:'🎙️', name:'Locución para videos académicos', meta:'Voz clara, entrega en audio limpio', price:'S/15'},
-  {tag:'Diseño', icon:'🖊️', name:'Diagramación de tesis en Word', meta:'Formato APA / normas de tu facultad', price:'S/40'},
-];
-
-function renderGrid(containerId, items){
-  const el = document.getElementById(containerId);
-  el.innerHTML = items.map((it,i)=>`
-    <div class="card">
-      <div class="card-media" style="background:${pick(i)}">${it.icon}</div>
-      <div class="card-body">
-        <span class="card-tag">${it.tag}</span>
-        <h3>${it.name}</h3>
-        <p class="meta">${it.meta}</p>
-        <div class="card-foot">
-          <span class="price">${it.price}</span>
-          <button class="contact-btn">Contactar</button>
-        </div>
-      </div>
-    </div>
-  `).join('');
-}
-renderGrid('vitrinaGrid', vitrina);
-renderGrid('librosGrid', libros);
-renderGrid('serviciosGrid', servicios);
-
-document.querySelectorAll('.nav-tab').forEach(tab=>{
-  tab.addEventListener('click', ()=>{
-    document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
-    tab.classList.add('active');
-    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
-    document.getElementById(tab.dataset.panel).classList.add('active');
-  });
-});
-
-document.querySelectorAll('.filter-row').forEach(row=>{
-  row.querySelectorAll('.chip').forEach(chip=>{
-    chip.addEventListener('click', ()=>{
-      row.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
-      chip.classList.add('active');
+// ===== BACKEND FIREBASE =====
+const fb = {
+  mode:'firebase',
+  init(onUser,onList){
+    this.onUser=onUser;
+    firebase.initializeApp(FIREBASE_CONFIG);
+    this.auth=firebase.auth(); this.db=firebase.firestore();
+    this.auth.onAuthStateChanged(async u=>{
+      if(!u) return onUser(null);
+      const d=await this.db.collection('users').doc(u.uid).get();
+      onUser({uid:u.uid,email:u.email,...(d.exists?d.data():{})});
     });
-  });
-});
+    this.db.collection('listings').orderBy('createdAt','desc').onSnapshot(
+      snap=>onList(snap.docs.map(d=>({id:d.id,...d.data()}))),
+      err=>console.error(err));
+  },
+  async register(p){
+    const {password,...profile}=p;
+    const c=await this.auth.createUserWithEmailAndPassword(p.email,password);
+    await this.db.collection('users').doc(c.user.uid).set(profile);
+    this.onUser({uid:c.user.uid,...profile});
+  },
+  login(email,password){ return this.auth.signInWithEmailAndPassword(email,password); },
+  logout(){ return this.auth.signOut(); },
+  add(l){ return this.db.collection('listings').add({...l,createdAt:firebase.firestore.FieldValue.serverTimestamp()}); },
+  remove(id){ return this.db.collection('listings').doc(id).delete(); }
+};
 
-// Modal de ingreso / registro
-const authOverlay = document.getElementById('authOverlay');
-document.getElementById('openAuthBtn').addEventListener('click', ()=> authOverlay.classList.add('open'));
-document.getElementById('closeAuthBtn').addEventListener('click', ()=> authOverlay.classList.remove('open'));
-authOverlay.addEventListener('click', (e)=>{ if(e.target === authOverlay) authOverlay.classList.remove('open'); });
+const backend = (FIREBASE_CONFIG && window.firebase) ? fb : local;
+const ERRORS = {
+  'auth/email-already-in-use':'Ese correo ya tiene un perfil.',
+  'auth/invalid-credential':'Correo o contraseña incorrectos.',
+  'auth/wrong-password':'Correo o contraseña incorrectos.',
+  'auth/user-not-found':'Correo o contraseña incorrectos.',
+  'auth/weak-password':'La contraseña debe tener al menos 6 caracteres.',
+  'permission-denied':'No tienes permiso para hacer esto. Revisa las reglas de Firestore.'
+};
+const errMsg = e => ERRORS[e.code] || e.message || 'Ocurrió un error. Inténtalo de nuevo.';
+const isUnmsm = m => /^[^@\s]+@unmsm\.edu\.pe$/i.test(m);
 
-function switchAuthForm(target){
-  document.querySelectorAll('.modal-tab').forEach(t=>t.classList.toggle('active', t.dataset.form === target));
-  document.querySelectorAll('.auth-form').forEach(f=>f.classList.remove('active'));
-  document.getElementById(target === 'login' ? 'loginForm' : 'registerForm').classList.add('active');
+// ===== RENDER =====
+function card(l){
+  const own = state.user && l.uid === state.user.uid;
+  const i = [...String(l.id)].reduce((a,c)=>a+c.charCodeAt(0),0);
+  const price = Number(l.price) > 0 ? 'S/' + l.price : 'A consultar';
+  const btn = own
+    ? `<button class="contact-btn" data-del="${esc(l.id)}">Eliminar</button>`
+    : `<button class="contact-btn" data-contact="${esc(l.id)}" ${l.sellerPhone?'':'disabled'}>${l.sellerPhone?'Contactar':'Ejemplo'}</button>`;
+  return `<div class="card">
+    <div class="card-media" style="background:${COLORS[i%COLORS.length]}">${ICON[l.category]||'📦'}</div>
+    <div class="card-body">
+      <span class="card-tag">${esc(l.category)}</span>
+      <h3>${esc(l.title)}</h3>
+      <p class="meta">${esc(l.description)}</p>
+      <p class="seller">${esc(l.sellerName)} · ${esc(l.sellerFaculty)}</p>
+      <div class="card-foot"><span class="price">${price}</span>${btn}</div>
+    </div></div>`;
 }
-document.querySelectorAll('.modal-tab').forEach(t=> t.addEventListener('click', ()=> switchAuthForm(t.dataset.form)));
-document.querySelectorAll('[data-switch]').forEach(a=> a.addEventListener('click', (e)=>{
-  e.preventDefault(); switchAuthForm(a.dataset.switch);
-}));
-
-document.getElementById('registerForm').addEventListener('submit', (e)=>{
-  e.preventDefault();
-  alert('Perfil creado (demo). En la versión real esto guardaría tu cuenta de estudiante.');
-  authOverlay.classList.remove('open');
-});
-document.getElementById('loginForm').addEventListener('submit', (e)=>{
-  e.preventDefault();
-  alert('Sesión iniciada (demo).');
-  authOverlay.classList.remove('open');
-});
-
-function applyFilter(){
-  const term = document.getElementById('searchInput').value.toLowerCase().trim();
-  if(!term) return;
-  if([...vitrina,...libros,...servicios].some(it=>it.name.toLowerCase().includes(term))){
-    // basic demo behavior: just keep as-is, real filtering would go here
+function render(){
+  const q = state.q.toLowerCase().trim();
+  for(const sec in SECTIONS){
+    $('chips-'+sec).innerHTML = ['Todos',...SECTIONS[sec].cats].map(c =>
+      `<button class="chip ${state.cat[sec]===c?'active':''}" data-sec="${sec}" data-cat="${esc(c)}">${esc(c)}</button>`).join('');
+    const items = state.listings.filter(l => l.section===sec
+      && (state.cat[sec]==='Todos' || l.category===state.cat[sec])
+      && (!q || (l.title+' '+l.description+' '+l.category).toLowerCase().includes(q)));
+    $('grid-'+sec).innerHTML = items.length ? items.map(card).join('')
+      : '<p class="empty">No hay publicaciones todavía. ¡Publica la primera!</p>';
   }
 }
+function setUser(u){
+  state.user = u;
+  $('openAuthBtn').textContent = u ? 'Salir (' + esc((u.name||'').split(' ')[0]) + ')' : 'Ingresar / Crear perfil';
+  render();
+}
+
+// ===== MODALES =====
+function openAuth(tab,msg){
+  switchAuthForm(tab||'login'); $('authError').textContent = msg||'';
+  $('authOverlay').classList.add('open');
+}
+function switchAuthForm(target){
+  document.querySelectorAll('.modal-tab').forEach(t=>t.classList.toggle('active', t.dataset.form===target));
+  document.querySelectorAll('#authOverlay .auth-form').forEach(f=>f.classList.remove('active'));
+  $(target==='login'?'loginForm':'registerForm').classList.add('active');
+}
+let pubSection = 'vitrina';
+function openPub(sec){
+  if(!state.user) return openAuth('login','Ingresa o crea tu perfil para publicar.');
+  pubSection = sec;
+  $('pubTitle').textContent = 'Publicar ' + SECTIONS[sec].noun;
+  $('pubCat').innerHTML = SECTIONS[sec].cats.map(c=>`<option>${esc(c)}</option>`).join('');
+  $('pubError').textContent = ''; $('pubForm').reset();
+  $('pubOverlay').classList.add('open');
+}
+
+// ===== EVENTOS =====
+document.querySelectorAll('.nav-tab[data-panel]').forEach(tab=>{
+  tab.addEventListener('click',()=>{
+    document.querySelectorAll('.nav-tab[data-panel]').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    $(tab.dataset.panel).classList.add('active');
+  });
+});
+$('openAuthBtn').addEventListener('click',()=>{ state.user ? backend.logout() : openAuth('login'); });
+$('closeAuthBtn').addEventListener('click',()=>$('authOverlay').classList.remove('open'));
+$('closePubBtn').addEventListener('click',()=>$('pubOverlay').classList.remove('open'));
+['authOverlay','pubOverlay'].forEach(id=>$(id).addEventListener('click',e=>{ if(e.target===$(id)) $(id).classList.remove('open'); }));
+document.querySelectorAll('.modal-tab').forEach(t=>t.addEventListener('click',()=>switchAuthForm(t.dataset.form)));
+document.querySelectorAll('[data-switch]').forEach(a=>a.addEventListener('click',e=>{ e.preventDefault(); switchAuthForm(a.dataset.switch); }));
+$('searchInput').addEventListener('input',e=>{ state.q=e.target.value; render(); });
+
+document.addEventListener('click',async e=>{
+  const t = e.target.closest('[data-cat],[data-add],[data-del],[data-contact]');
+  if(!t) return;
+  if(t.dataset.cat){ state.cat[t.dataset.sec]=t.dataset.cat; render(); }
+  else if(t.dataset.add){ openPub(t.dataset.add); }
+  else if(t.dataset.del){
+    if(confirm('¿Eliminar esta publicación?')){ try{ await backend.remove(t.dataset.del); }catch(err){ alert(errMsg(err)); } }
+  } else if(t.dataset.contact){
+    if(!state.user) return openAuth('login','Ingresa para contactar al vendedor.');
+    const l = state.listings.find(x=>x.id===t.dataset.contact);
+    if(l) window.open('https://wa.me/51'+l.sellerPhone+'?text='+encodeURIComponent('Hola '+l.sellerName+', vi tu publicación "'+l.title+'" en UNISPOT.'),'_blank');
+  }
+});
+
+$('registerForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const f = Object.fromEntries(new FormData(e.target));
+  f.email = f.email.trim().toLowerCase(); f.name = f.name.trim();
+  if(!isUnmsm(f.email)) return $('authError').textContent='Usa tu correo institucional @unmsm.edu.pe.';
+  try{ await backend.register(f); e.target.reset(); $('authOverlay').classList.remove('open'); }
+  catch(err){ $('authError').textContent = errMsg(err); }
+});
+$('loginForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const f = Object.fromEntries(new FormData(e.target));
+  try{ await backend.login(f.email.trim().toLowerCase(), f.password); e.target.reset(); $('authOverlay').classList.remove('open'); }
+  catch(err){ $('authError').textContent = errMsg(err); }
+});
+$('pubForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const f = Object.fromEntries(new FormData(e.target)), u = state.user;
+  try{
+    await backend.add({section:pubSection,category:f.category,title:f.title.trim(),description:f.description.trim(),
+      price:String(f.price),uid:u.uid,sellerName:u.name,sellerFaculty:u.faculty,sellerPhone:u.phone});
+    $('pubOverlay').classList.remove('open');
+  }catch(err){ $('pubError').textContent = errMsg(err); }
+});
+
+// ===== ARRANQUE =====
+if(backend.mode==='local') $('modeBanner').hidden = false;
+backend.init(setUser, list=>{ state.listings=list; render(); });
 </script>
 
 </body>
